@@ -5,6 +5,11 @@
     - isilon: "{{ lookup('hashi_vault', 'secret=kv/isilon:address') }}"
     - isi_user: "{{ lookup('hashi_vault', 'secret=kv/isilon:user') }}" 
     - isi_pass: "{{ lookup('hashi_vault', 'secret=kv/isilon:password') }}" 
+    - ldap_user: "{{ lookup('hashi_vault', 'secret=kv/ldapsearch:ldap_user') }}"   
+    - ldap_pass: "{{ lookup('hashi_vault', 'secret=kv/ldapsearch:ldap_pass') }}"  
+    - ldap_addr: "{{ lookup('hashi_vault', 'secret=kv/ldapsearch:ldap_addr') }}"  
+    - ldap_base_dn: "{{ lookup('hashi_vault', 'secret=kv/ldapsearch:ldap_base_dn') }}"   
+
 
   tasks:
 
@@ -12,6 +17,24 @@
      shell: ssh "{{ isi_user}}@{{ isilon }}" 'ls {{ basedir }}'
      register: children
 
+   - name: Get email addressess
+     shell: "{{ command }}"
+     loop: "{{ children.stdout.split(\n) }}"
+     vars: 
+       - command: "ldapsearch -x -LLL -H {{ ldap_addr }} -b {{ ldap_base_dn }} -D {{ ldap_user }} -w {{ ldap_pass }} '(&(objectclass=user)(samaccountname={{ item }}))' mail | grep 'mail:' | sed 's/mail: //'"
+     register: emails
+
+   - name: Set facts
+     set_fact:
+       child_dir: "{{ child_dir | default([]) | union([ item.item ]) }}" 
+       email: "{{ email | default([])| union([ item.stdout ]) }}"
+     loop: "{{ emails.results }}"
+
+   - name: debug facts
+     debug: 
+       msg: "{{ item }}"
+     loop: "{{ child_dir }}"
+          
    - name: Get filesystem details
      dellemc_isilon_filesystem:
        onefs_host: "{{ isilon }}"
