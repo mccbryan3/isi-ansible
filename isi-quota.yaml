@@ -1,4 +1,4 @@
-- name: Gather filesystem facts
+- name: Configure Advisory Quotas for Isilon Directories
   hosts: localhost
   vars:
     - basedir: /ifs/lab-zone/home
@@ -44,7 +44,7 @@
        path: "{{ basedir }}/{{ dir }}"
        state: present
        quota:
-         advisory_limit_size: 100
+         advisory_limit_size: 5
          cap_unit: GB
          quota_state: present
      loop: "{{ child_dirs | dict2items }}"
