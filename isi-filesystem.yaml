@@ -10,7 +10,6 @@
     - ldap_addr: "{{ lookup('hashi_vault', 'secret=kv/ldapsearch:ldap_addr') }}"  
     - ldap_base_dn: "{{ lookup('hashi_vault', 'secret=kv/ldapsearch:ldap_base_dn') }}"   
 
-
   tasks:
 
    - name: Get isi basedir children
@@ -26,14 +25,13 @@
 
    - name: Set facts
      set_fact:
-       child_dir: "{{ child_dir | default([]) | union([ item.item ]) }}" 
-       email: "{{ email | default([])| union([ item.stdout ]) }}"
+       child_dirs: "{{ child_dirs | default({}) | combine( {item.item: item.stdout } ) }}" 
      loop: "{{ emails.results }}"
 
    - name: debug facts
      debug: 
-       msg: "{{ item }}"
-     loop: "{{ child_dir }}"
+       msg: "{{ item.key }}" 
+     loop: "{{ child_dirs | dict2items }}"
           
    - name: Get filesystem details
      dellemc_isilon_filesystem:
@@ -42,13 +40,15 @@
        verify_ssl: no
        api_user: "{{ isi_user }}"
        api_password: "{{ isi_pass }}"
-       path: "{{ basedir }}/{{ item }}"
+       path: "{{ basedir }}/{{ dir }}"
        state: present
        quota:
          advisory_limit_size: 5
          cap_unit: GB
          quota_state: present
-     loop: "{{ children.stdout.split(\n) }}"
+     loop: "{{ child_dirs | dict2items }}"
+     vars:
+       - dir: "{{ item.key }}"
      register: file_facts
 
    - name: Debug the facts gathered
