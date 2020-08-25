@@ -31,7 +31,7 @@
 
    - name: debug facts
      debug: 
-       msg: "{{ item.key }}" 
+       msg: "folder_name: {{ item.key }} emai_address: {{ item.value }}" 
      loop: "{{ child_dirs | dict2items }}"
           
    - name: Get filesystem details
@@ -44,7 +44,7 @@
        path: "{{ basedir }}/{{ dir }}"
        state: present
        quota:
-         advisory_limit_size: 5
+         advisory_limit_size: 100
          cap_unit: GB
          quota_state: present
      loop: "{{ child_dirs | dict2items }}"
@@ -54,10 +54,15 @@
 
    - name: Debug the facts gathered
      debug:
-       msg: "{{ quota_size }}"
+       msg: "FolderName: {{ folder_name }} Email Address: {{ folder_email }} QuotaID: {{ quota_id }}"
      loop: "{{ file_facts.results }}"
+     loop_control:
+       label: "{{ path }}"
      vars:
+       - folder_name: "{{ item.item.key }}"
+       - folder_email: "{{ item.item.value }}"
        - quota_size: "{{ default_quota if (logical_size < default_quota ) else ((logical_size | int)* 1.25) }}"
+       - quota_id: "{{ item.quota_details.quotas[0].id }}"
        - logical_size: "{{ item.quota_details.quotas[0].usage.logical }}"
        - path: "{{ item.invocation.module_args.path }}" 
        - created: "{{ item.filesystem_details.attrs | selectattr('name', 'equalto', 'create_time') | map(attribute='value') | list | first }}"
@@ -66,3 +71,34 @@
        - default_quota: '26843545600'
        - default_age: 7
      when: (date_diff | int) > default_age
+
+   - name: Debug the facts gathered
+     debug:
+       msg: "{{ notification_body | to_json }}"
+     loop: "{{ file_facts.results }}"
+     loop_control:
+       label: "{{ path }}"
+     vars:
+       - notification_body: >
+           action_alert: false,
+           action_email_address: {{ item.item.value }},
+           action_email_owner: true,
+           condition: exceeded,
+           email_template: null,
+           hold_off: 604800,
+           id: advisory-exceeded,
+           schedule: null,
+           threshold: advisory
+       - folder_name: "{{ item.item.key }}"
+       - folder_email: "{{ item.item.value }}"
+       - quota_size: "{{ default_quota if (logical_size < default_quota ) else ((logical_size | int)* 1.25) }}"
+       - quota_id: "{{ item.quota_details.quotas[0].id }}"
+       - logical_size: "{{ item.quota_details.quotas[0].usage.logical }}"
+       - path: "{{ item.invocation.module_args.path }}" 
+       - created: "{{ item.filesystem_details.attrs | selectattr('name', 'equalto', 'create_time') | map(attribute='value') | list | first }}"
+       - today: "{{ ansible_date_time.date }}"
+       - date_diff: "{{ (( today | to_datetime('%Y-%m-%d')) - (created | to_datetime('%a, %d %b %Y %H:%M:%S GMT'))).days }}"
+       - default_quota: '26843545600'
+       - default_age: 7
+     when: (date_diff | int) > default_age
+
