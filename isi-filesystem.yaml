@@ -27,6 +27,7 @@
      set_fact:
        child_dirs: "{{ child_dirs | default({}) | combine( {item.item: item.stdout } ) }}" 
      loop: "{{ emails.results }}"
+     no_log: true
 
    - name: debug facts
      debug: 
