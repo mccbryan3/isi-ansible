@@ -34,7 +34,7 @@
        msg: "folder_name: {{ item.key }} emai_address: {{ item.value }}" 
      loop: "{{ child_dirs | dict2items }}"
           
-   - name: Get filesystem details
+   - name: Get filesystem details and set advisory quota
      dellemc_isilon_filesystem:
        onefs_host: "{{ isilon }}"
        port_no: "8080"
@@ -52,7 +52,7 @@
        - dir: "{{ item.key }}"
      register: file_facts
 
-   - name: Debug the facts gathered
+   - name: Set advisory quota notification
      uri:
        url: "https://{{ isilon }}:8080/platform/1/quota/quotas/{{ quota_id }}/notifications"
        method: POST
