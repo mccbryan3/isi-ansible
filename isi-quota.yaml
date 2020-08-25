@@ -83,6 +83,6 @@
        - created: "{{ item.filesystem_details.attrs | selectattr('name', 'equalto', 'create_time') | map(attribute='value') | list | first }}"
        - today: "{{ ansible_date_time.date }}"
        - date_diff: "{{ (( today | to_datetime('%Y-%m-%d')) - (created | to_datetime('%a, %d %b %Y %H:%M:%S GMT'))).days }}"
-       - default_quota: '26843545600'
+       - default_quota: '5368709120'
        - default_age: 7
      when: (date_diff | int) > default_age
