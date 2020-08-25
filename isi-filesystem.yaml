@@ -1,0 +1,44 @@
+- name: Gather filesystem facts
+  hosts: localhost
+  vars:
+    - basedir: /ifs/lab-zone/home
+    - isilon: "{{ lookup('hashi_vault', 'secret=kv/isilon:address') }}"
+    - isi_user: "{{ lookup('hashi_vault', 'secret=kv/isilon:user') }}" 
+    - isi_pass: "{{ lookup('hashi_vault', 'secret=kv/isilon:password') }}" 
+
+  tasks:
+
+   - name: Get isi basedir children
+     shell: ssh "{{ isi_user}}@{{ isilon }}" 'ls {{ basedir }}'
+     register: children
+
+   - name: Get filesystem details
+     dellemc_isilon_filesystem:
+       onefs_host: "{{ isilon }}"
+       port_no: "8080"
+       verify_ssl: no
+       api_user: "{{ isi_user }}"
+       api_password: "{{ isi_pass }}"
+       path: "{{ basedir }}/{{ item }}"
+       state: present
+       quota:
+         advisory_limit_size: 5
+         cap_unit: GB
+         quota_state: present
+     loop: "{{ children.stdout.split(\n) }}"
+     register: file_facts
+
+   - name: Debug the facts gathered
+     debug:
+       msg: "{{ quota_size }}"
+     loop: "{{ file_facts.results }}"
+     vars:
+       - quota_size: "{{ default_quota if (logical_size < default_quota ) else ((logical_size | int)* 1.25) }}"
+       - logical_size: "{{ item.quota_details.quotas[0].usage.logical }}"
+       - path: "{{ item.invocation.module_args.path }}" 
+       - created: "{{ item.filesystem_details.attrs | selectattr('name', 'equalto', 'create_time') | map(attribute='value') | list | first }}"
+       - today: "{{ ansible_date_time.date }}"
+       - date_diff: "{{ (( today | to_datetime('%Y-%m-%d')) - (created | to_datetime('%a, %d %b %Y %H:%M:%S GMT'))).days }}"
+       - default_quota: '26843545600'
+       - default_age: 7
+     when: (date_diff | int) > default_age
